@@ -15,7 +15,7 @@ from lib.object_detection.meta_architectures.ssd_meta_arch import SSDMetaArch
 import numpy as np
 slim = tf.contrib.slim
 
-
+## no usage found
 def match_and_select_feature(groundtruth_boxes, anchors, feature_maps):
     """ Select features on the groundtruth box locations
     
@@ -136,7 +136,7 @@ class MANMetaArch(SSDMetaArch):
         self._box_predictor = box_predictor
 
         self._box_coder = box_coder
-        self._feature_extractor = feature_extractor
+        self._feature_extractor = feature_extractor  ## important ->  ssd_mobilenet_v1
         self._matcher = matcher
         self._region_similarity_calculator = region_similarity_calculator
 
@@ -511,8 +511,10 @@ class MANMetaArch(SSDMetaArch):
         """
         if inputs.dtype is not tf.float32:
             raise ValueError('`preprocess` expects a tf.float32 tensor')
-        if win_size == None:
+
+        if win_size == None:  ## when pre-process template patch, winsize=[128,128]
             win_size=[300,300]
+
         with tf.name_scope('Preprocessor'):
             # TODO: revisit whether to always use batch size as  the number of
             # parallel iterations vs allow for dynamic batching.

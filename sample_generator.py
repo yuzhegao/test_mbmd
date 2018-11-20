@@ -51,14 +51,15 @@ class SampleGenerator():
 
         # (center_x, center_y, w, h)
         sample = np.array([bb[0]+bb[2]/2, bb[1]+bb[3]/2, bb[2], bb[3]], dtype='float32')
-        samples = np.tile(sample[None,:],(n,1))
+        samples = np.tile(sample[None,:],(n,1)) ## shape (1,4) -> (n,4)
 
         # vary aspect ratio
         if self.aspect_f is not None:
-            ratio = np.random.rand(n,1)*2-1
+            ratio = np.random.rand(n,1)*2-1 ## value (-1,1)
             samples[:,2:] *= self.aspect_f ** np.concatenate([ratio, -ratio],axis=1)
 
         # sample generation
+        ## cannot understand the difference below ???
         if self.type=='gaussian':
             samples[:,:2] += self.trans_f * np.mean(bb[2:]) * np.clip(0.5*np.random.randn(n,2),-1,1)
             samples[:,2:] *= self.scale_f ** np.clip(0.5*np.random.randn(n,1),-1,1)
@@ -66,19 +67,19 @@ class SampleGenerator():
         elif self.type=='uniform':
             samples[:,:2] += self.trans_f * np.mean(bb[2:]) * (np.random.rand(n,2)*2-1)
             samples[:,2:] *= self.scale_f ** (np.random.rand(n,1)*2-1)
-        
+
         elif self.type=='whole':
             m = int(2*np.sqrt(n))
-            xy = np.dstack(np.meshgrid(np.linspace(0,1,m),np.linspace(0,1,m))).reshape(-1,2)
+            xy = np.dstack(np.meshgrid(np.linspace(0,1,m),np.linspace(0,1,m))).reshape(-1,2) ##the common usage of meshgrid
             xy = np.random.permutation(xy)[:n]
             samples[:,:2] = bb[2:]/2 + xy * (self.img_size-bb[2:]/2-1)
             #samples[:,:2] = bb[2:]/2 + np.random.rand(n,2) * (self.img_size-bb[2:]/2-1)
             samples[:,2:] *= self.scale_f ** (np.random.rand(n,1)*2-1)
 
         # adjust bbox range
-        samples[:,2:] = np.clip(samples[:,2:], 10, self.img_size-10)
+        samples[:,2:] = np.clip(samples[:,2:], 10, self.img_size-10)  ## not near bound of img
         if self.valid:
-            samples[:,:2] = np.clip(samples[:,:2], samples[:,2:]/2, self.img_size-samples[:,2:]/2-1)
+            samples[:,:2] = np.clip(samples[:,:2], samples[:,2:]/2, self.img_size-samples[:,2:]/2-1)  ## noting [:2] and [2:]
         else:
             samples[:,:2] = np.clip(samples[:,:2], 0, self.img_size)
 

@@ -98,6 +98,7 @@ def build_man_model(model_config, is_training):
         normalize_loss_by_num_matches,
         hard_example_miner,
         add_summaries=False)
+    ## notice： except is_training/add_summaries, all param here is coming from model_config (the .config file)
 
 
 

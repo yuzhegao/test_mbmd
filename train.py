@@ -6,6 +6,7 @@ import sys
 sys.path.append('./lib/') ## !!!
 sys.path.append('./lib/slim/')
 
+#from core import trainer
 from core import trainer_seq, input_reader
 from core.model_builder import build_man_model
 from google.protobuf import text_format
@@ -21,10 +22,12 @@ flags = tf.app.flags
 flags.DEFINE_string('train_dir', 'model/dump',
                     'Directory to save the checkpoints and training summaries.')
 
-flags.DEFINE_string('pipeline_config_path', 'model/ssd_mobilenet_tracking.config',
+## .config file
+flags.DEFINE_string('pipeline_config_path', '/home/yuzhe/PycharmProjects/test_mbmd/MBMD_vot_model/model/ssd_mobilenet_tracking.config',
                     'Path to a pipeline_pb2.TrainEvalPipelineConfig config '
                     'file. If provided, other configs are ignored')
 
+## three args below maybe useless
 flags.DEFINE_string('train_config_path', '',
                     'Path to a train_pb2.TrainConfig config file.')
 
@@ -34,6 +37,7 @@ flags.DEFINE_string('input_config_path', '',
 flags.DEFINE_string('model_config_path', '',
                     'Path to a model_pb2.DetectionModel config file.')
 
+## dataset path
 flags.DEFINE_string('image_root', '/media/Linux/Research/DataSet/ILSVRC2014_DET/image/ILSVRC2014_DET_train',
                     'Root path to input images')
 

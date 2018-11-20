@@ -56,6 +56,8 @@ def _create_input_queue(batch_size_per_clone, create_tensor_dict_fn, detection_m
         call input_queue.Dequeue().
     """
     tensor_dict = create_tensor_dict_fn()
+    #for i in tensor_dict:
+    #    print i
 
     def _read_image(folder, im_names, groundtruth_boxes, seq_length=20):
         num_frames = len(im_names)
@@ -87,8 +89,11 @@ def _create_input_queue(batch_size_per_clone, create_tensor_dict_fn, detection_m
     #     out_dict = sess.run(tensor_dict)
     #     _read_image(out_dict['folder'], out_dict['filename'], out_dict['groundtruth_boxes'], seq_length)
 
-    images, groundtruth_boxes, groundtruth_classes = tf.py_func(_read_image, [tensor_dict['folder'], tensor_dict['filename'],
-                                     tensor_dict['groundtruth_boxes'], seq_length], [tf.uint8, tf.float32, tf.float32])
+    images, groundtruth_boxes, groundtruth_classes = tf.py_func(_read_image,
+                                                                #[tensor_dict['folder'],tensor_dict['filename'],tensor_dict['groundtruth_boxes'], seq_length],
+                                                                [ tensor_dict['filename'],
+                                                                 tensor_dict['groundtruth_boxes'], seq_length ],
+                                                                [tf.uint8, tf.float32, tf.float32])
 
     images.set_shape([seq_length, 300, 300, 3])
     float_images = tf.to_float(images)
@@ -177,20 +182,27 @@ def _create_losses(input_queue, create_model_fn):
   detection_model.provide_groundtruth(groundtruth_boxes,
                                       groundtruth_classes,
                                       groundtruth_masks)
+  #print images
+  #print detection_model
   prediction_dict = detection_model.predict(images)
 
   losses_dict = detection_model.loss(prediction_dict)
   for loss_tensor in losses_dict.values():
-    tf.losses.add_loss(loss_tensor)
+    tf.losses.add_loss(loss_tensor)  ## here we add all the loss -> total loss
 
 
 
 def train(create_model_fn, create_tensor_dict_fn, train_config, train_dir, img_root):
 
-    detection_model = create_model_fn()  ## a MANMetaArch object containing some model config
+    ## this fn maybe train the compute graph which build by Siamese-network
+    ## maybe use some fn of the network class
+
+    ## create the siamses network
+    detection_model = create_model_fn()  ## a MANMetaArch    which object containing some model config
     data_augmentation_options = [ preprocessor_builder.build(step)
                                     for step in train_config.data_augmentation_options]
 
+    ## prepare input
     with tf.device('cpu:0'):
         global_step = slim.create_global_step()
 
@@ -222,8 +234,13 @@ def train(create_model_fn, create_tensor_dict_fn, train_config, train_dir, img_r
       def initializer_fn(sess):
         init_saver.restore(sess, train_config.fine_tune_checkpoint)
       init_fn = initializer_fn
+
+
+
     # loss and grads
     total_loss = tf.losses.get_total_loss()
+    ## ??? maybe use tf.add_loss in network class   ->  in fn:_create_losses
+
     grads_and_vars = training_optimizer.compute_gradients(total_loss, tf.trainable_variables())
     # Optionally multiply bias gradients by train_config.bias_grad_multiplier.
     if train_config.bias_grad_multiplier:
@@ -267,7 +284,7 @@ def train(create_model_fn, create_tensor_dict_fn, train_config, train_dir, img_r
     saver = tf.train.Saver(
         keep_checkpoint_every_n_hours=keep_checkpoint_every_n_hours)
     slim.learning.train(
-        train_tensor,
+        train_tensor,  ##train_tensor = tf.identity(total_loss, name='train_op')
         logdir=train_dir,
         session_config=session_config,
         init_fn=init_fn,

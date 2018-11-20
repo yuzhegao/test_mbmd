@@ -212,12 +212,13 @@ def generate_init_training_samples(img, box, win_size, src_scales=None, tar_scal
     return out_images, init_img,out_gt_box
 
 def build_init_graph(model, model_scope, reuse=None):
-    input_init_image = tf.placeholder(dtype=tf.uint8, shape=[128,128,3])
+    input_init_image = tf.placeholder(dtype=tf.uint8, shape=[128,128,3]) ## template patch
     float_init_image = tf.to_float(input_init_image)
     float_init_image = tf.expand_dims(tf.expand_dims(float_init_image, axis=0), axis=0)
-    preprocessed_init_image = model.preprocess(float_init_image, [128,128])
+
+    preprocessed_init_image = model.preprocess(float_init_image, [128,128])  ## resize + mobilenet.preprocess
     with tf.variable_scope(model_scope, reuse=reuse):
-        init_feature_maps = model.extract_init_feature(preprocessed_init_image)
+        init_feature_maps = model.extract_init_feature(preprocessed_init_image) ## mobilenet.extract_features
     return init_feature_maps,input_init_image
 
 def build_box_predictor(model, model_scope,init_feature_maps,reuse=None):
@@ -226,16 +227,18 @@ def build_box_predictor(model, model_scope,init_feature_maps,reuse=None):
     float_images = tf.to_float(images)
     preprocessed_images = model.preprocess(float_images)
     preprocessed_images = tf.expand_dims(preprocessed_images, axis=0)
+
     input_init_gt_box = tf.constant(np.zeros((1, 4)), dtype=tf.float32)
     init_gt_box = tf.reshape(input_init_gt_box, shape=[1,1,4])
     groundtruth_classes = tf.ones(dtype=tf.float32, shape=[1, 1, 1])
+
     model.provide_groundtruth(init_gt_box,
                               groundtruth_classes,
                               None)
     with tf.variable_scope(model_scope, reuse=reuse):
         prediction_dict = model.predict_box_with_init(init_feature_maps, preprocessed_images, istraining=False)
 
-    detections = model.postprocess(prediction_dict)
+    detections = model.postprocess(prediction_dict)  ##
     original_image_shape = tf.shape(preprocessed_images)
     absolute_detection_boxlist = box_list_ops.to_absolute_coordinates(
         box_list.BoxList(tf.squeeze(detections['detection_boxes'], axis=0)),
