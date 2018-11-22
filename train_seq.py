@@ -1,11 +1,16 @@
+import os
+import sys
+sys.path.append('./lib/') ## !!!
+sys.path.append('./lib/slim/')
+
 import functools
 import tensorflow as tf
-from core import trainer_seq, input_reader
+from core import trainer_test, trainer_seq, input_reader
 from core.model_builder import build_man_model
 from google.protobuf import text_format
 
 from lib.object_detection.protos import pipeline_pb2
-import os
+
 
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
@@ -15,7 +20,7 @@ flags = tf.app.flags
 
 flags.DEFINE_string('train_dir', 'model/ssd_mobilenet_video1/',
                     'Directory to save the checkpoints and training summaries.')
-flags.DEFINE_string('pipeline_config_path', 'model/ssd_mobilenet_video.config',
+flags.DEFINE_string('pipeline_config_path', '/home/yuzhe/PycharmProjects/test_mbmd/MBMD_vot_model/model/ssd_mobilenet_video.config',
                     'Path to a pipeline_pb2.TrainEvalPipelineConfig config '
                     'file. If provided, other configs are ignored')
 flags.DEFINE_string('train_config_path', '',
@@ -59,6 +64,7 @@ def main(_):
     create_input_dict_fn = functools.partial(
         input_reader.read_seq, input_config)
     trainer_seq.train(model_fn, create_input_dict_fn, train_config, FLAGS.train_dir, FLAGS.image_root)
+    #trainer_test.train(model_fn, create_input_dict_fn, train_config)
 
 
 

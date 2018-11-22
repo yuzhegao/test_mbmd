@@ -149,7 +149,8 @@ def crop_search_region(img, gt, win_size, scale=4, mean_rgb=128, offset=None):
         min_x += offset[1]
         max_x += offset[1]
 
-    print "che {} / {}".format(gt, [min_y,min_x,max_y,max_x])
+    #print "che {} / {}".format(gt, [min_y,min_x,max_y,max_x])
+    ## in fact, the [min_y,min_x,max_y,max_x] always out of image
 
     win_loc = np.array([min_y, min_x]) ## what if min_x/min_y <0 ???
 
@@ -226,6 +227,9 @@ class MobileTracker(object):
         self.sess.run(tf.global_variables_initializer())
         #if not init_training:
         variables_to_restore = tf.global_variables()
+        for i in variables_to_restore:
+            print i
+        exit()
         restore_model(self.sess, model_scope, checkpoint_dir, variables_to_restore) ## restore the siamese network checkpoint
 
         ##-------------------------------------------------------------------------------------------------

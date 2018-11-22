@@ -5,6 +5,7 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import collections
 
+## notice!!! we extract the [19,19]/[10,10] feature map here
 class MobileNetFeaturePyramidExtractor(SSDMobileNetV1FeatureExtractor):
     def extract_features(self, preprocessed_inputs, init_extraction=False):
         """Extract features from preprocessed inputs.
@@ -52,7 +53,7 @@ class MobileNetFeaturePyramidExtractor(SSDMobileNetV1FeatureExtractor):
                 ['image size must at least be 33 in both height and width.'])
 
 
-            bottomup_features_names = [ 'Conv2d_11_pointwise', 'Conv2d_13_pointwise']
+            bottomup_features_names = [ 'Conv2d_11_pointwise', 'Conv2d_13_pointwise']  ## noting: it's important !!!!
             num_appended_layers = 0
             #appended_channel_num = [512, 256, 256, 256]
             appended_channel_num = [512]

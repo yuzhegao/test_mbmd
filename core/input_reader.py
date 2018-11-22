@@ -15,6 +15,8 @@ def read(input_config):
         record_path = input_config.tf_record_input_reader.input_path
     except:
         record_path = input_config
+        ## the path of .record file data
+
     input_record_queue = tf.train.string_input_producer([record_path])
     record_reader = tf.TFRecordReader()
     _, serialized_example = record_reader.read(input_record_queue)
@@ -26,6 +28,7 @@ def read(input_config):
             'bndbox/ymin': tf.FixedLenFeature([], tf.float32),
             'bndbox/xmax': tf.FixedLenFeature([], tf.float32),
             'bndbox/ymax': tf.FixedLenFeature([], tf.float32)})
+
     tensor_dict = dict()
     tensor_dict[fields.InputDataFields.filename] = features['image_name']
     bndbox = tf.stack([features['bndbox/ymin'], features['bndbox/xmin'],
@@ -48,6 +51,7 @@ def read_seq(input_config):
         record_path = input_config.tf_record_input_reader.input_path
     except:
         record_path = input_config
+
     input_record_queue = tf.train.string_input_producer([record_path])
     record_reader = tf.TFRecordReader()
     _, serialized_example = record_reader.read(input_record_queue)
@@ -76,5 +80,7 @@ def read_seq(input_config):
     classes_gt = util_ops.padded_one_hot_encoding(indices=classes_gt,
                                                   depth=num_classes, left_pad=0)
     tensor_dict[fields.InputDataFields.groundtruth_classes] = classes_gt
+
+    ## output dict: 'folder', 'filename', 'groundtruth_boxes', 'groundtruth_classes'
 
     return tensor_dict

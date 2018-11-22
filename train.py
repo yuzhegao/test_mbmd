@@ -72,7 +72,15 @@ def main(_):
         model_config=model_config,
         is_training=True)
     create_input_dict_fn = functools.partial(
-        input_reader.read, input_config)
+        input_reader.read_seq, input_config)
+    #print input_config
+    """
+    label_map_path: "/media/2TB/Research/Code/memory_augmented_tracker/data/imagenet_label_map.pbtxt"
+    tf_record_input_reader {
+        input_path: "/media/2TB/Research/DataSet/ILSVRC2015/TFRecord/train.record"
+    }
+
+    """
     trainer_seq.train(model_fn, create_input_dict_fn, train_config, FLAGS.train_dir, FLAGS.image_root)
 
 

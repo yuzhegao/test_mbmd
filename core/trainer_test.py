@@ -1,7 +1,7 @@
 import functools
 
 import tensorflow as tf
-from object_detection.trainer import _create_input_queue, _get_inputs
+from lib.object_detection.trainer import _create_input_queue, _get_inputs
 from object_detection.builders import preprocessor_builder, optimizer_builder
 from object_detection.utils import variables_helper
 import numpy as np
@@ -37,6 +37,7 @@ def _create_losses(input_queue, create_model_fn):
 
 def train(create_model_fn, create_tensor_dict_fn, train_config):
     detection_model = create_model_fn()
+    print detection_model,'\n'
     data_augmentation_options = [
               preprocessor_builder.build(step)
               for step in train_config.data_augmentation_options]
@@ -65,8 +66,8 @@ def train(create_model_fn, create_tensor_dict_fn, train_config):
     session_config = tf.ConfigProto(allow_soft_placement=True,
                                     log_device_placement=False)
     sess = tf.Session(config=session_config)
-    coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+    #coord = tf.train.Coordinator()
+    #threads = tf.train.start_queue_runners(sess=sess, coord=coord)
     global_summaries = set([])
     training_optimizer = optimizer_builder.build(train_config.optimizer,
                                                  global_summaries)

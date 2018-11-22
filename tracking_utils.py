@@ -222,7 +222,7 @@ def build_init_graph(model, model_scope, reuse=None):
     return init_feature_maps,input_init_image
 
 def build_box_predictor(model, model_scope,init_feature_maps,reuse=None):
-    input_cur_image = tf.placeholder(dtype=tf.uint8, shape=[300, 300, 3])
+    input_cur_image = tf.placeholder(dtype=tf.uint8, shape=[300, 300, 3]) ## should feed
     images = tf.expand_dims(input_cur_image, axis=0)
     float_images = tf.to_float(images)
     preprocessed_images = model.preprocess(float_images)
@@ -234,17 +234,23 @@ def build_box_predictor(model, model_scope,init_feature_maps,reuse=None):
 
     model.provide_groundtruth(init_gt_box,
                               groundtruth_classes,
-                              None)
+                              None)  ## the gt box(es), MAYBE for compute loss ???
+                                ## I think, it make no sense during inferencce
     with tf.variable_scope(model_scope, reuse=reuse):
         prediction_dict = model.predict_box_with_init(init_feature_maps, preprocessed_images, istraining=False)
+        ## model.predict_box_with_init --> this fn is custom
+        ## should be Using the init_feature_maps(template filter) to detect the box
 
-    detections = model.postprocess(prediction_dict)  ##
+    detections = model.postprocess(prediction_dict)  ## NMS
     original_image_shape = tf.shape(preprocessed_images)
     absolute_detection_boxlist = box_list_ops.to_absolute_coordinates(
-        box_list.BoxList(tf.squeeze(detections['detection_boxes'], axis=0)),
-        original_image_shape[2], original_image_shape[3])
+                            box_list.BoxList(tf.squeeze(detections['detection_boxes'], axis=0)),
+                            original_image_shape[2],  ## 300
+                            original_image_shape[3]   ## 300
+                            )
     return absolute_detection_boxlist.get(), detections['detection_scores'], input_cur_image
 
+## no usage
 def build_test_graph(model, model_scope, reuse=None,weights_dict=None):
     input_init_gt_box = tf.constant(np.zeros((1,4)), dtype=tf.float32)
     # input_init_image = tf.constant(init_img_array, dtype=tf.uint8)
@@ -272,7 +278,7 @@ def build_test_graph(model, model_scope, reuse=None,weights_dict=None):
         original_image_shape[2], original_image_shape[3])
     return absolute_detection_boxlist.get(), detections['detection_scores'], input_cur_image, input_init_image
 
-
+## no usage
 def build_extract_feature_graph(model, model_scope,reuse=None):
     batch_size = 20
     seq_len = 1

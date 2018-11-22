@@ -256,10 +256,10 @@ class MANMetaArch(SSDMetaArch):
         # reshape and transpose each feature map to the size of [seq_length, batch_size, height, width, channel]
         feature_maps = [tf.transpose(tf.reshape(m,
                                    [self._batch_size,
-                                    self._seq_length,
+                                    self._seq_length, ## ???
                                     m.get_shape()[1].value,
                                     m.get_shape()[2].value,
-                                    m.get_shape()[3].value]), perm=[1,0,2,3,4]) for m in feature_maps]
+                                    m.get_shape()[3].value]), perm=[1,0,2,3,4])   for m in feature_maps]
         feature_array_list = list()
         for feature_map in feature_maps:
             feature_array = tf.TensorArray(dtype=tf.float32, size=self._seq_length, clear_after_read=False)
@@ -291,12 +291,16 @@ class MANMetaArch(SSDMetaArch):
                 #tiled_init_feature = tiled_init_feature[:,:crop_shape,:crop_shape,:]
                 tmp1 = m*tiled_init_feature
                 concate_feature_maps.append(tf.concat([tf.nn.l2_normalize(tmp1,dim=3)*10, tf.nn.l2_normalize(tiled_init_feature,dim=3)*10], axis=3))
+
             reg_pre, cls_pre = self._add_box_predictions_to_feature_maps(concate_feature_maps,reuse=reuse)
             box_reg_array = box_reg_array.write(time, reg_pre)
             box_cls_array = box_cls_array.write(time, cls_pre)
             # groundtruth_boxes = groundtruth_boxes_array.read(time)
             # selected_feature = match_and_select_feature(groundtruth_boxes, self.anchors, feature_maps)
             return time+1, box_reg_array, box_cls_array
+
+
+
         _, box_reg_array, box_cls_array = tf.while_loop(
             cond=lambda time, *_: time < self._seq_length,
             body=_time_step,
@@ -304,7 +308,9 @@ class MANMetaArch(SSDMetaArch):
             parallel_iterations=1,
             swap_memory=True)
         #_, _, box_reg_array, box_cls_array = _time_step(0, selected_feature, box_reg_array, box_cls_array)
+
         box_reg = box_reg_array.stack()
+        #print '\n',box_reg.get_shape() ## (?, 1, 4110, 4)
         box_reg.set_shape([self._seq_length,
                            self._batch_size,
                            box_reg.get_shape()[2].value,
@@ -313,7 +319,11 @@ class MANMetaArch(SSDMetaArch):
         box_reg = tf.reshape(box_reg, [self._batch_size * (self._seq_length),
                                        box_reg.get_shape()[2].value,
                                        box_reg.get_shape()[3].value])
+        #print '\n', box_reg.get_shape() #(1, 4110, 4)
+
+
         box_cls = box_cls_array.stack()
+        #print '\n',box_cls.get_shape() ##(?, 1, 4110, 2)
         box_cls.set_shape([self._seq_length,
                            self._batch_size,
                            box_cls.get_shape()[2].value,
@@ -322,6 +332,8 @@ class MANMetaArch(SSDMetaArch):
         box_cls = tf.reshape(box_cls, [self._batch_size * (self._seq_length),
                                        box_cls.get_shape()[2].value,
                                        box_cls.get_shape()[3].value])
+        #print '\n', box_cls.get_shape() #(1, 4110, 2)
+
         return box_reg, box_cls
 
     def _assign_targets(self, groundtruth_boxes_list, groundtruth_classes_list):
@@ -370,6 +382,7 @@ class MANMetaArch(SSDMetaArch):
             self._target_assigner, self.anchors, groundtruth_boxlists,
             groundtruth_classes_with_background_list)
 
+    ## useless
     def extract_feature(self,preprocessed_inputs):
         self._batch_size, self._seq_length, self._input_size, _, _ = preprocessed_inputs.get_shape().as_list()
 
@@ -380,7 +393,7 @@ class MANMetaArch(SSDMetaArch):
 
         output_dict = {
             'feature_maps0': feature_maps[0],
-            'feature_maps1': feature_maps[1],
+            'feature_maps1': feature_maps[1],  ## feature here is useless !!!
             # 'feature_maps2': feature_maps[2],
             # 'feature_maps3': feature_maps[3],
             # 'feature_maps4': feature_maps[4],
@@ -389,6 +402,8 @@ class MANMetaArch(SSDMetaArch):
 
         return output_dict
 
+    ## noting : extract_init_feature ---> extract template feature
+    ## scope: 'InitFeatureExtractor'
     def extract_init_feature(self,preprocessed_init_input):
         _, _, self.init_input_size, _, _ = preprocessed_init_input.get_shape().as_list()
         preprocessed_init_input = tf.reshape(preprocessed_init_input,
@@ -401,7 +416,9 @@ class MANMetaArch(SSDMetaArch):
         return init_feature_maps
 
     def predict_box_with_init(self,init_feature_maps, preprocessed_input,istraining=False):
+        ## main fn  here !!!!!
 
+        ## print preprocessed_input.get_shape().as_list() [B, 1, 300, 300, 3]
         self._batch_size, self._seq_length, self._input_size, _, _ = preprocessed_input.get_shape().as_list()
         preprocessed_inputs = tf.reshape(preprocessed_input, [-1, self._input_size, self._input_size, 3])
 
@@ -412,9 +429,14 @@ class MANMetaArch(SSDMetaArch):
 
         self._is_training = istraining
         feature_map_spatial_dims = self._get_feature_map_spatial_dims(feature_maps)
+        print "\ncheck {}\n".format(feature_map_spatial_dims) ## [(19, 19), (10, 10)]   define in feature_extractor.py
         self._anchors = self._anchor_generator.generate(feature_map_spatial_dims)
-        (box_encodings, class_predictions_with_background
-         ) = self._add_sequential_box_predictions_to_feature_maps(init_feature_maps, feature_maps)
+
+        (box_encodings,
+         class_predictions_with_background) = \
+        self._add_sequential_box_predictions_to_feature_maps(init_feature_maps, feature_maps)
+
+        ## here we use init_feature_maps(template) to detect
         predictions_dict = {
             'box_encodings': box_encodings,
             'class_predictions_with_background': class_predictions_with_background,
@@ -441,7 +463,7 @@ class MANMetaArch(SSDMetaArch):
 
     def predict(self, preprocessed_init_input, preprocessed_inputs,istraining=False,reuse=None,weights_dict=None):
         """Predicts unpostprocessed tensors from input tensor.
-  
+
         This function takes an input batch of images and runs it through the forward
         pass of the network to yield unpostprocessesed predictions.
   
@@ -483,8 +505,13 @@ class MANMetaArch(SSDMetaArch):
         #     weights_dict = dict()
         #     weights_dict = self._box_predictor.get_weights(weights_dict,reuse=reuse)
 
+
+
+
+
         feature_map_spatial_dims = self._get_feature_map_spatial_dims(feature_maps)
         self._anchors = self._anchor_generator.generate(feature_map_spatial_dims)
+
         (box_encodings, class_predictions_with_background
          ) = self._add_sequential_box_predictions_to_feature_maps(init_feature_maps, feature_maps,reuse=reuse)
         predictions_dict = {

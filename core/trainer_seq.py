@@ -30,6 +30,9 @@ def _split_tensor_dict(in_tensor_dict, seq_length):
         for key, value in in_tensor_dict.items():
             tensor_dict[key] = value[i]
         out_tensor_dicts.append(tensor_dict)
+
+        ## input: {'image': (20,300,300,3); 'gt_box':(20,4)}
+        ## output: [{'image': (300,300,3); 'gt_box':(4,)}, {same}, {same} .......{same}]
     return out_tensor_dicts
 
 
@@ -49,13 +52,14 @@ def _create_input_queue(batch_size_per_clone, create_tensor_dict_fn, detection_m
       data_augmentation_options: a list of tuples, where each tuple contains a
         data augmentation function and a dictionary containing arguments and their
         values (see preprocessor.py).
-  
+
     Returns:
       input queue: a batcher.BatchQueue object holding enqueued tensor_dicts
         (which hold images, boxes and targets).  To get a batch of tensor_dicts,
         call input_queue.Dequeue().
     """
     tensor_dict = create_tensor_dict_fn()
+    print tensor_dict
     #for i in tensor_dict:
     #    print i
 
@@ -90,21 +94,22 @@ def _create_input_queue(batch_size_per_clone, create_tensor_dict_fn, detection_m
     #     _read_image(out_dict['folder'], out_dict['filename'], out_dict['groundtruth_boxes'], seq_length)
 
     images, groundtruth_boxes, groundtruth_classes = tf.py_func(_read_image,
-                                                                #[tensor_dict['folder'],tensor_dict['filename'],tensor_dict['groundtruth_boxes'], seq_length],
-                                                                [ tensor_dict['filename'],
-                                                                 tensor_dict['groundtruth_boxes'], seq_length ],
+                                                                [tensor_dict['folder'],tensor_dict['filename'],tensor_dict['groundtruth_boxes'], seq_length],
+                                                                #[ tensor_dict['filename'],tensor_dict['groundtruth_boxes'], seq_length ],
                                                                 [tf.uint8, tf.float32, tf.float32])
 
     images.set_shape([seq_length, 300, 300, 3])
     float_images = tf.to_float(images)
     groundtruth_boxes.set_shape([seq_length, 4])
     groundtruth_classes.set_shape([seq_length, 1])
+    #print '\n',images,'\n'
+
     tensor_dict = dict()
     tensor_dict[fields.InputDataFields.image] = float_images
     tensor_dict[fields.InputDataFields.groundtruth_boxes] = groundtruth_boxes
     tensor_dict[fields.InputDataFields.groundtruth_classes] = groundtruth_classes
 
-    tensor_dicts = _split_tensor_dict(tensor_dict, seq_length)
+    tensor_dicts = _split_tensor_dict(tensor_dict, seq_length) ## a seq
     if data_augmentation_options:
         tensor_dicts = [preprocess(tensor_dict.copy()) for tensor_dict in tensor_dicts]
 
@@ -112,10 +117,14 @@ def _create_input_queue(batch_size_per_clone, create_tensor_dict_fn, detection_m
         tensor_dicts[i][fields.InputDataFields.image] = \
             detection_model.preprocess(tensor_dicts[i][fields.InputDataFields.image])
         tensor_dicts[i][fields.InputDataFields.groundtruth_classes].set_shape([1, 1])
-        # tensor_dicts[i][fields.InputDataFields.filename].set_shape([1, 1])
         tensor_dicts[i][fields.InputDataFields.groundtruth_boxes].set_shape([1, 4])
 
     concat_tensor_dict = _concat_tensor_dicts(tensor_dicts)
+    #print '\n',concat_tensor_dict,'\n'
+
+    ## tensor_dict['images']  (20, 300, 300, 3)
+    ## tensor_dict['groundtruth_boxes']  (20, 4)
+    ## tensor_dict['groundtruth_classes']  (20, 1)
 
     batched_tensor = tf.train.batch(concat_tensor_dict,
                                     capacity=batch_queue_capacity,
@@ -161,10 +170,12 @@ def _create_input_queue(batch_size_per_clone, create_tensor_dict_fn, detection_m
     return prefetch_queue
 
 def _get_inputs(input_queue):
-    tensor_dict = input_queue.dequeue()
+    tensor_dict = input_queue.dequeue() ## dequeue data
+
     images = tensor_dict[fields.InputDataFields.image]
     groundtruth_box = tensor_dict[fields.InputDataFields.groundtruth_boxes]
     groundtruth_class = tensor_dict[fields.InputDataFields.groundtruth_classes]
+
     return images, groundtruth_box, groundtruth_class, None
 
 def _create_losses(input_queue, create_model_fn):
@@ -178,6 +189,7 @@ def _create_losses(input_queue, create_model_fn):
   (images, groundtruth_boxes, groundtruth_classes,
    groundtruth_masks
   ) = _get_inputs(input_queue)
+  #print _get_inputs(input_queue)
 
   detection_model.provide_groundtruth(groundtruth_boxes,
                                       groundtruth_classes,
