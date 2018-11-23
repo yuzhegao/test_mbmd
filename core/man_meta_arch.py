@@ -285,10 +285,13 @@ class MANMetaArch(SSDMetaArch):
             for m in feature_maps:
                 #tile_num = int(np.ceil(int(m.get_shape()[1])/ float(int(init_feature_maps.get_shape()[1]))))
                 tile_num = int(m.get_shape()[1])
+                #print init_feature_maps.get_shape()
                 tiled_init_feature = tf.tile(init_feature_maps,
-                                             [1,tile_num,tile_num,1])   ## notice: here we fusion the feature map !!!
+                                             [1,tile_num,tile_num,1])   ## notice: here we fusion the feature map !!! ************************************************************
                 #crop_shape = int(m.get_shape()[1])
                 #tiled_init_feature = tiled_init_feature[:,:crop_shape,:crop_shape,:]
+                #print m.get_shape()
+                #print tiled_init_feature.get_shape()
                 tmp1 = m*tiled_init_feature
                 concate_feature_maps.append(tf.concat([tf.nn.l2_normalize(tmp1,dim=3)*10, tf.nn.l2_normalize(tiled_init_feature,dim=3)*10], axis=3))
 
@@ -486,6 +489,7 @@ class MANMetaArch(SSDMetaArch):
               [batch, height_i, width_i, depth_i].
         """
         self._is_training = istraining
+        #print preprocessed_inputs.get_shape().as_list()
         self._batch_size, self._seq_length, self._input_size, _, _ = preprocessed_inputs.get_shape().as_list()
         _, _, self.init_input_size, _, _ = preprocessed_init_input.get_shape().as_list()
         preprocessed_init_input = tf.reshape(preprocessed_init_input,

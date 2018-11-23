@@ -79,7 +79,9 @@ def read_seq(input_config):
     classes_gt -= label_id_offset
     classes_gt = util_ops.padded_one_hot_encoding(indices=classes_gt,
                                                   depth=num_classes, left_pad=0)
-    tensor_dict[fields.InputDataFields.groundtruth_classes] = classes_gt
+    tensor_dict[fields.InputDataFields.groundtruth_classes] = tf.to_int32(classes_gt)
+
+    #print '\n',tensor_dict,'\n'
 
     ## output dict: 'folder', 'filename', 'groundtruth_boxes', 'groundtruth_classes'
 

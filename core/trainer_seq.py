@@ -39,51 +39,50 @@ def _split_tensor_dict(in_tensor_dict, seq_length):
 
 def _create_input_queue(batch_size_per_clone, create_tensor_dict_fn, detection_model,
                         batch_queue_capacity, num_batch_queue_threads,
-                        prefetch_queue_capacity, data_augmentation_options, image_path, seq_length=20):
-    """Sets up reader, prefetcher and returns input queue.
-  
-    Args:
-      batch_size_per_clone: batch size to use per clone.
-      create_tensor_dict_fn: function to create tensor dictionary.
-      batch_queue_capacity: maximum number of elements to store within a queue.
-      num_batch_queue_threads: number of threads to use for batching.
-      prefetch_queue_capacity: maximum capacity of the queue used to prefetch
-                               assembled batches.
-      data_augmentation_options: a list of tuples, where each tuple contains a
-        data augmentation function and a dictionary containing arguments and their
-        values (see preprocessor.py).
+                        prefetch_queue_capacity, data_augmentation_options, image_rootpath, seq_length=20):
 
-    Returns:
-      input queue: a batcher.BatchQueue object holding enqueued tensor_dicts
-        (which hold images, boxes and targets).  To get a batch of tensor_dicts,
-        call input_queue.Dequeue().
-    """
     tensor_dict = create_tensor_dict_fn()
-    print tensor_dict
+    #print tensor_dict
     #for i in tensor_dict:
     #    print i
 
-    def _read_image(folder, im_names, groundtruth_boxes, seq_length=20):
+    def _read_image(folder, im_names, groundtruth_boxes, seq_length=10):
         num_frames = len(im_names)
         size = 300
+        template_size = 128
+
         if num_frames >= seq_length:
             start_id = np.random.randint(0,num_frames-seq_length+1)
             frame_ids = range(start_id, start_id+seq_length)
         else:
             frame_ids = np.random.randint(0, num_frames, seq_length)
+
         imgs = np.zeros([seq_length, size, size, 3], dtype=np.uint8)
-        # imgs = list()
+        template = np.zeros([1, template_size, template_size, 3], dtype=np.uint8)
+        first_gt = groundtruth_boxes[frame_ids[0],:]
+
         for ind, frame_id in enumerate(frame_ids):
-            img = Image.open(os.path.join(image_path+folder, im_names[frame_id] + '.JPEG'))
+            img = Image.open(im_names[frame_id]) ## im_names contain absolute path
+
+            ## write the temlate img 128*128
+            if ind == 0:
+                template_array = img.crop(first_gt)
+                template_array = template_array.resize(np.int32([template_size,template_size]))
+                template_array = np.array(template_array).astype(np.uint8)
+                if template_array.ndim < 3:
+                    template_array = np.repeat(np.expand_dims(template_array, axis=2), repeats=3, axis=2)
+                template[0] = template_array
+
             img = img.resize(np.int32([size, size]))
             img = np.array(img).astype(np.uint8)
             if img.ndim < 3:
                 img = np.repeat(np.expand_dims(img, axis=2), repeats=3, axis=2)
             imgs[ind] = img
-            # imgs.append(img)
+
+
         groundtruth_boxes = groundtruth_boxes[frame_ids,:]
         groundtruth_classes = np.ones([seq_length, 1], dtype=np.float32)
-        return imgs, groundtruth_boxes, groundtruth_classes
+        return imgs, template, groundtruth_boxes, groundtruth_classes
     #
     # sess = tf.Session()
     # coord = tf.train.Coordinator()
@@ -93,22 +92,24 @@ def _create_input_queue(batch_size_per_clone, create_tensor_dict_fn, detection_m
     #     out_dict = sess.run(tensor_dict)
     #     _read_image(out_dict['folder'], out_dict['filename'], out_dict['groundtruth_boxes'], seq_length)
 
-    images, groundtruth_boxes, groundtruth_classes = tf.py_func(_read_image,
+    images, template, groundtruth_boxes, groundtruth_classes = tf.py_func(_read_image,
                                                                 [tensor_dict['folder'],tensor_dict['filename'],tensor_dict['groundtruth_boxes'], seq_length],
-                                                                #[ tensor_dict['filename'],tensor_dict['groundtruth_boxes'], seq_length ],
-                                                                [tf.uint8, tf.float32, tf.float32])
+                                                                [tf.uint8, tf.uint8, tf.float32, tf.float32])
 
     images.set_shape([seq_length, 300, 300, 3])
-    float_images = tf.to_float(images)
+    template.set_shape([1, 128, 128, 3])
+    float_images, float_template = tf.to_float(images), tf.to_float(template)
     groundtruth_boxes.set_shape([seq_length, 4])
     groundtruth_classes.set_shape([seq_length, 1])
     #print '\n',images,'\n'
 
     tensor_dict = dict()
     tensor_dict[fields.InputDataFields.image] = float_images
+    #tensor_dict['template'] = float_template  should add template to dict  after pre-process
     tensor_dict[fields.InputDataFields.groundtruth_boxes] = groundtruth_boxes
     tensor_dict[fields.InputDataFields.groundtruth_classes] = groundtruth_classes
 
+    """
     tensor_dicts = _split_tensor_dict(tensor_dict, seq_length) ## a seq
     if data_augmentation_options:
         tensor_dicts = [preprocess(tensor_dict.copy()) for tensor_dict in tensor_dicts]
@@ -120,13 +121,17 @@ def _create_input_queue(batch_size_per_clone, create_tensor_dict_fn, detection_m
         tensor_dicts[i][fields.InputDataFields.groundtruth_boxes].set_shape([1, 4])
 
     concat_tensor_dict = _concat_tensor_dicts(tensor_dicts)
+    concat_tensor_dict['template'] = float_template
     #print '\n',concat_tensor_dict,'\n'
+    """
+    tensor_dict['template'] = float_template
 
     ## tensor_dict['images']  (20, 300, 300, 3)
     ## tensor_dict['groundtruth_boxes']  (20, 4)
     ## tensor_dict['groundtruth_classes']  (20, 1)
 
-    batched_tensor = tf.train.batch(concat_tensor_dict,
+    #batched_tensor = tf.train.batch(concat_tensor_dict,
+    batched_tensor = tf.train.batch(tensor_dict,
                                     capacity=batch_queue_capacity,
                                     batch_size=batch_size_per_clone,
                                     num_threads=num_batch_queue_threads,
@@ -173,10 +178,11 @@ def _get_inputs(input_queue):
     tensor_dict = input_queue.dequeue() ## dequeue data
 
     images = tensor_dict[fields.InputDataFields.image]
+    template = tensor_dict['template']
     groundtruth_box = tensor_dict[fields.InputDataFields.groundtruth_boxes]
     groundtruth_class = tensor_dict[fields.InputDataFields.groundtruth_classes]
 
-    return images, groundtruth_box, groundtruth_class, None
+    return images, template, groundtruth_box, groundtruth_class, None
 
 def _create_losses(input_queue, create_model_fn):
   """Creates loss function for a DetectionModel.
@@ -186,17 +192,18 @@ def _create_losses(input_queue, create_model_fn):
     create_model_fn: A function to create the DetectionModel.
   """
   detection_model = create_model_fn()
-  (images, groundtruth_boxes, groundtruth_classes,
+  (images, template, groundtruth_boxes, groundtruth_classes,
    groundtruth_masks
   ) = _get_inputs(input_queue)
   #print _get_inputs(input_queue)
 
   detection_model.provide_groundtruth(groundtruth_boxes,
-                                      groundtruth_classes,
+                                      tf.to_int32(groundtruth_classes),
                                       groundtruth_masks)
   #print images
   #print detection_model
-  prediction_dict = detection_model.predict(images)
+  prediction_dict = detection_model.predict(template, images)
+  print prediction_dict,'\n'
 
   losses_dict = detection_model.loss(prediction_dict)
   for loss_tensor in losses_dict.values():
@@ -216,7 +223,8 @@ def train(create_model_fn, create_tensor_dict_fn, train_config, train_dir, img_r
 
     ## prepare input
     with tf.device('cpu:0'):
-        global_step = slim.create_global_step()
+        #global_step = slim.create_global_step()
+        global_step = tf.train.create_global_step()
 
         input_queue = _create_input_queue(train_config.batch_size,
                                           create_tensor_dict_fn,
@@ -291,10 +299,12 @@ def train(create_model_fn, create_tensor_dict_fn, train_config, train_dir, img_r
 
     session_config = tf.ConfigProto(allow_soft_placement=True,
                                     log_device_placement=False)
+    session_config.gpu_options.allow_growth = True
     # session_config.gpu_options.allow_growth = True
     keep_checkpoint_every_n_hours = train_config.keep_checkpoint_every_n_hours
     saver = tf.train.Saver(
         keep_checkpoint_every_n_hours=keep_checkpoint_every_n_hours)
+
     slim.learning.train(
         train_tensor,  ##train_tensor = tf.identity(total_loss, name='train_op')
         logdir=train_dir,
@@ -305,6 +315,21 @@ def train(create_model_fn, create_tensor_dict_fn, train_config, train_dir, img_r
             train_config.num_steps if train_config.num_steps else None),
         save_summaries_secs=120,
         saver=saver)
+    
+
+
+    """
+    with tf.Session(config=session_config) as sess:
+        sess.run(tf.global_variables_initializer())
+
+        tf.train.start_queue_runners(sess=sess)
+
+        tensor_dict = input_queue.dequeue()
+        dic = sess.run(tensor_dict)
+        print dic
+    """
+
+
 
     # coord = tf.train.Coordinator()
     # threads = tf.train.start_queue_runners(sess=sess, coord=coord)
