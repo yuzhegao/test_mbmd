@@ -126,8 +126,8 @@ def crop_search_region(img, gt, win_size, scale=4, mean_rgb=128, offset=None):
     bnd_h = bnd_ymax - bnd_ymin
     # cx, cy = gt[:2] + gt[2:] / 2
     cy, cx = (bnd_ymin + bnd_ymax)/2, (bnd_xmin+bnd_xmax)/2
-    diag = np.sum( bnd_h** 2 + bnd_w**2) ** 0.5
-    origin_win_size = diag * scale
+    #diag = np.sum(bnd_h** 2 + bnd_w**2) ** 0.5
+    #origin_win_size = diag * scale
     origin_win_size_h, origin_win_size_w = bnd_h * scale, bnd_w * scale
     # origin_win_size_h = origin_win_size
     # origin_win_size_w = origin_win_size
@@ -162,6 +162,7 @@ def crop_search_region(img, gt, win_size, scale=4, mean_rgb=128, offset=None):
     unscaled_w, unscaled_h = [max_x - min_x + 1, max_y - min_y + 1] ## before scaled to 300*300
     min_x_win, min_y_win, max_x_win, max_y_win = (0, 0, unscaled_w, unscaled_h)
     ## in search region coordinate
+
     min_x_im, min_y_im, max_x_im, max_y_im = (min_x, min_y, max_x+1, max_y+1)
     ## in origin img coordinate   (useless)
 
@@ -227,12 +228,17 @@ class MobileTracker(object):
         self.sess.run(tf.global_variables_initializer())
         #if not init_training:
         variables_to_restore = tf.global_variables()
+
+        """
         for i in variables_to_restore:
             print i
         exit()
+        """
+
         restore_model(self.sess, model_scope, checkpoint_dir, variables_to_restore) ## restore the siamese network checkpoint
 
         ##-------------------------------------------------------------------------------------------------
+        ## prepare for the template feature vector
 
         init_img = Image.fromarray(image) ## the first frame
         init_img_array = np.array(init_img)
@@ -251,7 +257,7 @@ class MobileTracker(object):
         gt_boxes[0,0] = init_gt[0] / float(init_img.height)
         gt_boxes[0,1] = init_gt[1] / float(init_img.width)
         gt_boxes[0,2] = init_gt[2] / float(init_img.height)
-        gt_boxes[0,3] = init_gt[3] / float(init_img.width)  ## ymin xmin ymax xmax  -> ratio  (very confused )
+        gt_boxes[0,3] = init_gt[3] / float(init_img.width)  ## ymin xmin ymax xmax  -> relative coord to origin img  (very confused )
 
         img1_xiaobai = np.array(init_img)
         pad_x = 36.0 / 264.0 * (gt_boxes[0, 3] - gt_boxes[0, 1]) * init_img.width
@@ -262,6 +268,7 @@ class MobileTracker(object):
         starty = gt_boxes[0, 0] * init_img.height - pad_y
         endx = gt_boxes[0, 3] * init_img.width + pad_x
         endy = gt_boxes[0, 2] * init_img.height + pad_y
+        ## so here: just slightly enlarge the bbox cropping area
 
         left_pad = max(0, int(-startx))
         top_pad = max(0, int(-starty))
@@ -438,6 +445,7 @@ class MobileTracker(object):
 
         cropped_img, last_gt_norm, win_loc, scale = crop_search_region(cur_ori_img, self.last_gt, 300, mean_rgb=128)
         ## not read fn: crop_search_region
+
         cur_img_array = np.array(cropped_img)
         detection_box_ori, scores = self.sess.run([self.pre_box_tensor, self.scores_tensor],
                                              feed_dict={self.input_cur_image: cur_img_array,
@@ -454,7 +462,7 @@ class MobileTracker(object):
         detection_box_ori[:, 2] = detection_box_ori[:, 2] * scale[0] + win_loc[0]
         detection_box_ori[:, 3] = detection_box_ori[:, 3] * scale[1] + win_loc[1]
         ## look fn:crop_search_region
-        ## just turn the bbox  in search region coordinate --> origin img coordinate
+        ## just turn the bbox  in search region coordinate --> origin img(search region) coordinate
 
         rank = np.argsort(scores)
         k = 20

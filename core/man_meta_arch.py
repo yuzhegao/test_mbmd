@@ -1,6 +1,3 @@
-
-from abc import abstractmethod
-
 import re
 import tensorflow as tf
 import functools
@@ -374,8 +371,9 @@ class MANMetaArch(SSDMetaArch):
             box_list.BoxList(tf.expand_dims(boxes, axis=0)) for boxes in groundtruth_boxes_list
         ]
 
-        groundtruth_classes_list = tf.reshape(groundtruth_classes_list, [self._batch_size*(self._seq_length), -1])
+        groundtruth_classes_list = tf.reshape(groundtruth_classes_list, [self._batch_size*(self._seq_length), -1]) ## [batchsize*num_seq, 1]
         groundtruth_classes_list = tf.unstack(groundtruth_classes_list, axis=0)
+
         groundtruth_classes_with_background_list = [
             tf.reshape(tf.one_hot(one_hot_encoding, self.num_classes+1), [1, self.num_classes+1])
             for one_hot_encoding in groundtruth_classes_list
@@ -432,7 +430,7 @@ class MANMetaArch(SSDMetaArch):
 
         self._is_training = istraining
         feature_map_spatial_dims = self._get_feature_map_spatial_dims(feature_maps)
-        print "\ncheck {}\n".format(feature_map_spatial_dims) ## [(19, 19), (10, 10)]   define in feature_extractor.py
+        #print "\ncheck {}\n".format(feature_map_spatial_dims) ## [(19, 19), (10, 10)]   define in feature_extractor.py
         self._anchors = self._anchor_generator.generate(feature_map_spatial_dims)
 
         (box_encodings,

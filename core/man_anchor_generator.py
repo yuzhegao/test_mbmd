@@ -1,4 +1,4 @@
-from object_detection.anchor_generators.multiple_grid_anchor_generator import MultipleGridAnchorGenerator
+from lib.object_detection.anchor_generators.multiple_grid_anchor_generator import MultipleGridAnchorGenerator
 import numpy as np
 import tensorflow as tf
 

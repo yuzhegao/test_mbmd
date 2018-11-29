@@ -241,6 +241,8 @@ def train(create_model_fn, create_tensor_dict_fn, train_config, train_dir, img_r
 
 
 
+
+
     # create initial restore op
     ## restore the checkpoint , notice !!!!!
     init_fn = None
