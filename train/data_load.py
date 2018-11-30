@@ -16,7 +16,7 @@ def convert_to_one_hot(y, C):
 
 
 ## otb raw gt : [x y w h] & (x,y) in low corner
-class otb_dataset(data.Dataset):
+class otb_dataset(object):
     def __init__(self,data_rootpath, num_seq=1, frame_interval=10, template_size=128, img_size=300):
         self.data_rootpath = data_rootpath
         self.num_seq = num_seq
@@ -52,7 +52,7 @@ class otb_dataset(data.Dataset):
                 lines[:,3] = lines[:,1] + lines[:,3]
 
 
-                self.gt_dict[seq] = lines ##(x1,y1,x2,y2)
+                self.gt_dict[seq] = lines
 
     def draw_gtbox(self,seq,idx):
         img = Image.open(self.seq_img_dict[seq][idx])
@@ -92,7 +92,7 @@ class otb_dataset(data.Dataset):
                 img_array = np.expand_dims(np.array(img),axis=2)
                 img_array = np.tile(img_array,(1,1,3))
                 img = Image.fromarray(img_array)
-            gt = seq_gtboxs[id] ##(x,y,)
+            gt = seq_gtboxs[id]
 
             if i == 0:
                 template = img.crop(first_gt)
@@ -104,10 +104,8 @@ class otb_dataset(data.Dataset):
                 gt_search_region = [(gt[0] - win_loc[0]) / scaled[0],
                                     (gt[1] - win_loc[1]) / scaled[1],
                                     (gt[2] - win_loc[0]) / scaled[0],
-                                    (gt[3] - win_loc[1]) / scaled[1]] ##(x1,y1,x2,y2)
-                new_gt = [gt_search_region[1],gt_search_region[0],gt_search_region[3],gt_search_region[2]]
-                ## (y1,x1,y2,x2)
-                gt_list.append(np.array(new_gt))
+                                    (gt[3] - win_loc[1]) / scaled[1],]
+                gt_list.append(np.array(gt_search_region))
 
         ## Test: the gt box in search region
         if None:
@@ -120,11 +118,11 @@ class otb_dataset(data.Dataset):
                 draw_box(img1,np.array(gt1).astype(np.int),img_path='/home/yuzhe/tmp/{}.jpg'.format(i))
 
         ## here transform and normalize
-        template = np.array(template) ##transpose to (h,w,3)
-        # template = transform(template)
-        # for i,im in enumerate(img_list):
-        #     img_list[i] = transform(im)
-        seq_input_img = np.stack(img_list,axis=0) ##transpose to (num_seq,h,w,3)
+        template = np.array(template) ##transpose to (H,W,3)
+        template = transform(template)
+        for i,im in enumerate(img_list):
+            img_list[i] = transform(im)
+        seq_input_img = np.stack(img_list,axis=0) ##transpose to (num_seq,H,W,3)
         seq_input_gt = np.stack(gt_list,axis=0)
 
         return template,seq_input_gt, seq_input_img
@@ -155,20 +153,19 @@ def otb_collate(batch):
 if __name__ == '__main__':
     test_loader = otb_dataset('/home/yuzhe/Downloads/part_vot_seq/')
     data_loader = torch.utils.data.DataLoader(test_loader,
-                                              batch_size=4, shuffle=False, num_workers=1, collate_fn=otb_collate)
+                                              batch_size=4, shuffle=True, num_workers=1, collate_fn=otb_collate)
     # a = test_loader[7]
     # print (len(test_loader))
 
     for idx, (templates, imgs, gts, labels) in enumerate(data_loader):
-        # print(templates.shape)
+        print(templates.shape)
         print (imgs.shape)
-        # print(gts.shape)
-        # print(labels.shape)
+        print(gts.shape)
+        print(labels.shape)
         # print(imgs[3][0].dtype)
-        img1 = Image.fromarray(imgs[0][0])
-        gt1 = gts[0][0]
-        gt1 = [gt1[1],gt1[0],gt1[3],gt1[2]]## (y1,x1,y2,x2)
-        draw_box(img1, gt1, img_path='/home/yuzhe/tmp/{}.jpg'.format(idx))
+        # img1 = Image.fromarray(imgs[3][0].transpose((1,0,2)))
+        # gt1 = gts[3][0]
+        # draw_box(img1, gt1, img_path='/home/yuzhe/tmp/{}.jpg'.format(idx))
 
 
         # seq = test_loader.seq_list[10]

@@ -22,6 +22,8 @@ import matplotlib.patches as patches
 import os
 from core.preprocessor import  preprocess
 
+from train.data_loader import otb_dataset,otb_collate
+import torch
 
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
@@ -87,6 +89,11 @@ def main(_):
     template = tf.placeholder(tf.float32, [batchsize, 1, 128, 128, 3])  ## each sequene only has one template
     groundtruth_boxes = tf.placeholder(tf.float32, [batchsize, num_seq, 4])
     groundtruth_classes = tf.placeholder(tf.int32, [batchsize, num_seq, 1])
+
+    otb_data = otb_dataset('/home/yuzhe/Downloads/part_vot_seq/')
+    otb_loader = torch.utils.data.DataLoader(otb_data,
+                                             batch_size=train_config.batch_size, shuffle=True, num_workers=1,
+                                             collate_fn=otb_collate, drop_last=True)
 
     detection_model = model_fn()
 

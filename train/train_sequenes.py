@@ -12,7 +12,6 @@ from core import trainer_test, trainer_seq, input_reader
 from core.model_builder import build_man_model
 from google.protobuf import text_format
 
-tf.nn.conv2d_transpose()
 
 from lib.object_detection.protos import pipeline_pb2
 import functools
@@ -73,9 +72,6 @@ def get_configs_from_pipeline_file():
 
 def main(_):
     ## dataset
-    otb_data = otb_dataset('/home/yuzhe/Downloads/part_vot_seq/')
-    otb_loader = torch.utils.data.DataLoader(otb_data,
-                            batch_size=2, shuffle=True, num_workers=1, collate_fn=otb_collate,drop_last=True)
 
     ## tf graph
     global_step = tf.train.create_global_step()
@@ -85,6 +81,11 @@ def main(_):
         build_man_model,
         model_config=model_config,
         is_training=True)
+
+    otb_data = otb_dataset('/home/yuzhe/Downloads/part_vot_seq/')
+    otb_loader = torch.utils.data.DataLoader(otb_data,
+                                             batch_size=train_config.batch_size, shuffle=True, num_workers=1,
+                                             collate_fn=otb_collate, drop_last=True)
 
     epochs = 100
     batchsize = train_config.batch_size
@@ -102,9 +103,11 @@ def main(_):
 
     losses_dict = detection_model.loss(prediction)
 
-    for loss_tensor in losses_dict.values():
-        tf.losses.add_loss(loss_tensor)
-    total_loss = tf.losses.get_total_loss()
+    #for loss_tensor in losses_dict.values():
+    #    tf.losses.add_loss(loss_tensor)
+    #    print loss_tensor
+    #total_loss = tf.losses.get_total_loss()
+    total_loss = losses_dict['localization_loss'] + losses_dict['classification_loss']
 
     training_optimizer = optimizer_builder.build(train_config.optimizer, set())
     train_op = training_optimizer.minimize(total_loss, global_step=global_step)
@@ -127,9 +130,9 @@ def main(_):
     #    print k.op.name
 
     #print '\n','\n','\n'
-    #for key,value in available_var_map.items():
+    #for key,value in var_map.items():
     #   print key
-    #   print value
+    #   #print value
     #print '\n','\n','\n'
 
     feat_extract_saver = tf.train.Saver(available_var_map)
@@ -168,6 +171,7 @@ def main(_):
                                                 template: templates_batch,
                                                 groundtruth_boxes: gts_batch,
                                                 groundtruth_classes: labels_batch})
+
                 print ('loss {}'.format(loss))
 
 
