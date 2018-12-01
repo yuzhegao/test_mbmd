@@ -82,14 +82,17 @@ def main(_):
         model_config=model_config,
         is_training=True)
 
+
+
+    epochs = 1000*700
+    batchsize = train_config.batch_size
+    num_seq = 1
+
     otb_data = otb_dataset('/home/yuzhe/Downloads/part_vot_seq/')
     otb_loader = torch.utils.data.DataLoader(otb_data,
                                              batch_size=train_config.batch_size, shuffle=True, num_workers=1,
                                              collate_fn=otb_collate, drop_last=True)
 
-    epochs = 100
-    batchsize = train_config.batch_size
-    num_seq = 1
     search_region = tf.placeholder(tf.float32, [batchsize, num_seq, 300, 300, 3])
     template = tf.placeholder(tf.float32, [batchsize, 1, 128, 128, 3])  ## each sequene only has one template
     groundtruth_boxes = tf.placeholder(tf.float32, [batchsize, num_seq, 4])
@@ -99,7 +102,7 @@ def main(_):
 
     detection_model.provide_groundtruth(groundtruth_boxes,
                                         groundtruth_classes)
-    prediction = detection_model.predict(template, search_region)
+    prediction = detection_model.predict(template, search_region,istraining=True)
 
     losses_dict = detection_model.loss(prediction)
 
@@ -138,6 +141,10 @@ def main(_):
     feat_extract_saver = tf.train.Saver(available_var_map)
     init_saver = tf.train.Saver(available_var_map_init)
 
+
+    ## save model
+    model_saver = tf.train.Saver(max_to_keep=3)
+
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
@@ -167,12 +174,20 @@ def main(_):
             for idx,(templates_batch, imgs_batch, gts_batch, labels_batch) in enumerate(otb_loader):
                 print ('iter {}'.format(idx))
 
-                _,loss = sess.run([train_op,total_loss], feed_dict={search_region: imgs_batch,
+                # test imgs_batch = np.ones_like(imgs_batch)
+                labels_batch = np.ones_like(labels_batch)
+
+                _,loss,loss_dict = sess.run([train_op,total_loss,losses_dict], feed_dict={search_region: imgs_batch,
                                                 template: templates_batch,
                                                 groundtruth_boxes: gts_batch,
                                                 groundtruth_classes: labels_batch})
 
                 print ('loss {}'.format(loss))
+                print (loss_dict)
+
+            if i%700 == 0 :
+                save_path = model_saver.save(sess, '../model/ssd_mobilenet_video1/model.ckpt', global_step=global_step)
+                print 'save model in {}'.format(save_path)
 
 
         """

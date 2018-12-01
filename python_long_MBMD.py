@@ -441,10 +441,9 @@ class MobileTracker(object):
         #     cur_ori_img = np.expand_dims(cur_ori_img, axis=2)
         #     cur_ori_img = np.repeat(cur_ori_img, repeats=3, axis=2)
         #     cur_ori_img = Image.fromarray(cur_ori_img)
-        cur_ori_img_array = np.array(cur_ori_img)
+        cur_ori_img_array = np.array(cur_ori_img) ##(h,w,3)
 
         cropped_img, last_gt_norm, win_loc, scale = crop_search_region(cur_ori_img, self.last_gt, 300, mean_rgb=128)
-        ## not read fn: crop_search_region
 
         cur_img_array = np.array(cropped_img)
         detection_box_ori, scores = self.sess.run([self.pre_box_tensor, self.scores_tensor],
@@ -455,6 +454,8 @@ class MobileTracker(object):
         #print scores[0]
         #print detection_box_ori
         #print '\n'
+
+        ## notice: win_loc [y_min,x_min]  scale [height_scale, width_scale]
 
 
         detection_box_ori[:, 0] = detection_box_ori[:, 0] * scale[0] + win_loc[0]

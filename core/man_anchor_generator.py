@@ -40,13 +40,24 @@ def create_man_anchors(num_layers=6,
     base_anchor_size = tf.constant(base_anchor_size, dtype=tf.float32)
     box_specs_list = []
     scales = 0.5*2**np.linspace(min_scale, max_scale, num_layers)
+    #print scales
     for layer, scale in enumerate(scales):
         layer_box_specs = []
         for aspect_ratio in aspect_ratios:
-            if layer < len(scales) - 1:
+            if layer < len(scales) - 1: ## the layers before the last_layer
                 for r in np.linspace(0,0.1,2):
                     layer_box_specs.append((scale*2**(r), aspect_ratio))
             else:
                 layer_box_specs.append((scale*2**(0), aspect_ratio))
         box_specs_list.append(layer_box_specs)
+    #for ls in box_specs_list:
+    #    print ls
+    # [('0.21763763363070815', 1.0), ('0.23325824017458927', 1.0), ('0.21763763363070815', 2.0),
+    #  ('0.23325824017458927', 2.0), ('0.21763763363070815', 0.5), ('0.23325824017458927', 0.5),
+    #  ('0.21763763363070815', 3.0), ('0.23325824017458927', 3.0), ('0.21763763363070815', 0.33329999446868896),
+    #  ('0.23325824017458927', 0.33329999446868896)]
+
+    # [('0.3298769722417042', 1.0), ('0.3298769722417042', 2.0), ('0.3298769722417042', 0.5), ('0.3298769722417042', 3.0),
+    #  ('0.3298769722417042', 0.33329999446868896)]
+
     return MultipleGridAnchorGenerator(box_specs_list, base_anchor_size)

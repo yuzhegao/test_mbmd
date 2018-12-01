@@ -141,7 +141,7 @@ def otb_collate(batch):
         gt_batch.append(sample[1])
 
     img_batch = np.stack(img_batch, axis=0)
-    gt_batch = np.stack(gt_batch, axis=0)
+    gt_batch = np.stack(gt_batch, axis=0)/300.0
     template_batch = np.expand_dims(np.stack(template_batch,axis=0),axis=1)
     batchsize,num_seq,_ = gt_batch.shape
     label_batch = np.ones((batchsize,num_seq,1),dtype=np.int)
@@ -168,7 +168,8 @@ if __name__ == '__main__':
         img1 = Image.fromarray(imgs[0][0])
         gt1 = gts[0][0]
         gt1 = [gt1[1],gt1[0],gt1[3],gt1[2]]## (y1,x1,y2,x2)
-        draw_box(img1, gt1, img_path='/home/yuzhe/tmp/{}.jpg'.format(idx))
+        #draw_box(img1, gt1, img_path='/home/yuzhe/tmp/{}.jpg'.format(idx))
+        print (templates.dtype)
 
 
         # seq = test_loader.seq_list[10]

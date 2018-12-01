@@ -178,6 +178,8 @@ class SSDMetaArch(model.DetectionModel):
     self._anchors = None
     self._add_summaries = add_summaries
 
+    self.test_dict = dict()
+
   @property
   def anchors(self):
     if not self._anchors:
@@ -409,11 +411,17 @@ class SSDMetaArch(model.DetectionModel):
        batch_reg_weights, match_list) = self._assign_targets(
            self.groundtruth_lists(fields.BoxListFields.boxes),
            self.groundtruth_lists(fields.BoxListFields.classes))
+
+      self.test_dict['batch_reg_targets'] = batch_reg_targets
+      self.test_dict['pred_box_encodes'] = prediction_dict['box_encodings']
+
       if self._add_summaries:
         self._summarize_input(
             self.groundtruth_lists(fields.BoxListFields.boxes), match_list)
+
       num_matches = tf.stack(
           [match.num_matched_columns() for match in match_list])
+
       location_losses = self._localization_loss(
           prediction_dict['box_encodings'],
           batch_reg_targets,

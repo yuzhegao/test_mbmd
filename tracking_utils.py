@@ -3,8 +3,8 @@ import numpy as np
 from google.protobuf import text_format
 from object_detection.protos import pipeline_pb2
 from core.model_builder import build_man_model
-from object_detection.core import box_list
-from object_detection.core import box_list_ops
+from lib.object_detection.core import box_list
+from lib.object_detection.core import box_list_ops
 from PIL import Image
 import scipy.io as sio
 import cv2

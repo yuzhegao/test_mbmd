@@ -162,7 +162,7 @@ class MANMetaArch(SSDMetaArch):
         self._anchors = None
         self._add_summaries = add_summaries
 
-
+        self.test_dict = dict()
 
     def _add_box_predictions_to_feature_maps(self, feature_maps,reuse=None):
         """Adds box predictors to each feature map and returns concatenated results.
@@ -513,6 +513,7 @@ class MANMetaArch(SSDMetaArch):
 
         feature_map_spatial_dims = self._get_feature_map_spatial_dims(feature_maps)
         self._anchors = self._anchor_generator.generate(feature_map_spatial_dims)
+
 
         (box_encodings, class_predictions_with_background
          ) = self._add_sequential_box_predictions_to_feature_maps(init_feature_maps, feature_maps,reuse=reuse)

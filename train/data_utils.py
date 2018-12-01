@@ -60,11 +60,28 @@ def crop_search_region(img, last_gt, win_size, area_scale=4, mean_rgb=128):
 def draw_box(img,box,img_path='img.jpg'):
     """
      img: PIL Image object
-     box: [x1 y1 x2 y2]
+     box: [x1 y1 x2 y2] or a list
     """
     x1, y1, x2, y2 = box
     draw = ImageDraw.Draw(img)
-    draw.line([(x1, y1), (x2, y1), (x2, y2), (x1, y2), (x1, y1)], width=4, fill='red')
+    draw.line([(x1, y1), (x2, y1), (x2, y2), (x1, y2), (x1, y1)], width=3, fill='red')
+    img.save(img_path)
+
+def draw_mulitbox(img,box_list,img_path='img.jpg'):
+    """
+     img: PIL Image object
+     box: [x1 y1 x2 y2] or a list
+    """
+    for idx,box in enumerate(box_list):
+        x1, y1, x2, y2 = box
+        draw = ImageDraw.Draw(img)
+        if idx == 0:
+            color = 'red'
+        elif idx ==1:
+            color = 'green'
+        else:
+            color = 'blue'
+        draw.line([(x1, y1), (x2, y1), (x2, y2), (x1, y2), (x1, y1)], width=3, fill=color)
     img.save(img_path)
 
 def transform(img, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)):

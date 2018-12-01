@@ -15,7 +15,7 @@
 
 """A function to build localization and classification losses from config."""
 
-from object_detection.core import losses
+from lib.object_detection.core import losses
 from object_detection.protos import losses_pb2
 
 
