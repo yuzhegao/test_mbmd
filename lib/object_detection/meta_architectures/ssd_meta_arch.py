@@ -408,12 +408,26 @@ class SSDMetaArch(model.DetectionModel):
     """
     with tf.name_scope(scope, 'Loss', prediction_dict.values()):
       (batch_cls_targets, batch_cls_weights, batch_reg_targets,
-       batch_reg_weights, match_list) = self._assign_targets(
+       batch_reg_weights, match_list,iou_list) = self._assign_targets(
            self.groundtruth_lists(fields.BoxListFields.boxes),
            self.groundtruth_lists(fields.BoxListFields.classes))
 
+
+
+      ## just for test and visualize -----------------------------------------
       self.test_dict['batch_reg_targets'] = batch_reg_targets
-      self.test_dict['pred_box_encodes'] = prediction_dict['box_encodings']
+      self.test_dict['batch_cls_targets'] = batch_cls_targets
+      self.test_dict['cls_pred'] = prediction_dict['class_predictions_with_background']
+      self.test_dict['reg_pred'] = prediction_dict['box_encodings']
+      self.test_dict['batch_reg_weights'] = batch_reg_weights
+      self.test_dict['batch_cls_weights'] = batch_cls_weights
+
+      self.test_dict['iou_matrix'] = iou_list
+      #print (len(match_list)),'\n'
+      self.test_dict['match1'] = match_list[0].unmatched_or_ignored_column_indices()
+      ## ----------------------------------------------------------------------
+
+
 
       if self._add_summaries:
         self._summarize_input(
@@ -422,6 +436,12 @@ class SSDMetaArch(model.DetectionModel):
       num_matches = tf.stack(
           [match.num_matched_columns() for match in match_list])
 
+      ## print batch_reg_targets  shape=(1, 4110, 4)
+      ## print prediction_dict['box_encodings'] shape=(1, 4110, 4)
+      # print prediction_dict['class_predictions_with_background'] shape=(2, 4110, 2)
+      # print batch_cls_targets  shape=(2, 4110, 2)
+      # print batch_cls_weights,'\n','\n'  shape=(2, 4110)
+
       location_losses = self._localization_loss(
           prediction_dict['box_encodings'],
           batch_reg_targets,
@@ -429,27 +449,44 @@ class SSDMetaArch(model.DetectionModel):
       cls_losses = self._classification_loss(
           prediction_dict['class_predictions_with_background'],
           batch_cls_targets,
-          weights=batch_cls_weights)
+          weights=batch_cls_weights)  ## the loss fn maybe correct in logic
+
+
+
+      self.test_dict['location_losses'] = location_losses
+      self.test_dict['cls_losses'] = cls_losses
+
+
+
 
       # Optionally apply hard mining on top of loss values
       localization_loss = tf.reduce_sum(location_losses)
       classification_loss = tf.reduce_sum(cls_losses)
+
       if self._hard_example_miner:
-        (localization_loss, classification_loss) = self._apply_hard_mining(
+        (localization_loss, classification_loss,select_idx1,num_pos1,num_neg1) = self._apply_hard_mining(
             location_losses, cls_losses, prediction_dict, match_list)
+        print num_pos1,num_neg1
+        self.test_dict['select'] = select_idx1
+        self.test_dict['num_pos'] = num_pos1
+        self.test_dict['num_neg'] = num_neg1
+
         if self._add_summaries:
           self._hard_example_miner.summarize()
+
 
       # Optionally normalize by number of positive matches
       normalizer = tf.constant(1.0, dtype=tf.float32)
       if self._normalize_loss_by_num_matches:
         normalizer = tf.maximum(tf.to_float(tf.reduce_sum(num_matches)), 1.0)
 
+      self.test_dict['num_matches'] = tf.reduce_sum(num_matches)
+      # print self._localization_loss_weight,self._classification_loss_weight
+
       loss_dict = {
           'localization_loss': (self._localization_loss_weight / normalizer) *
                                localization_loss,
-          'classification_loss': (self._classification_loss_weight /
-                                  normalizer) * classification_loss
+          'classification_loss': self._classification_loss_weight  * classification_loss
       }
     return loss_dict
 
@@ -534,6 +571,7 @@ class SSDMetaArch(model.DetectionModel):
         representing anchorwise location losses.
       cls_losses: Float tensor of shape [batch_size, num_anchors]
         representing anchorwise classification losses.
+
       prediction_dict: p a dictionary holding prediction tensors with
         1) box_encodings: 4-D float tensor of shape [batch_size, num_anchors,
           box_code_dimension] containing predicted boxes.
@@ -566,6 +604,10 @@ class SSDMetaArch(model.DetectionModel):
       decoded_boxlist = box_list.BoxList(box_location)
       decoded_boxlist.add_field('scores', box_score)
       decoded_boxlist_list.append(decoded_boxlist)
+
+    # print len(decoded_boxlist_list) --> num_images
+    self.test_dict['decoded_boxlist'] = decoded_boxlist_list[0].data['boxes']
+
     return self._hard_example_miner(
         location_losses=location_losses,
         cls_losses=cls_losses,

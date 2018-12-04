@@ -139,7 +139,7 @@ class MANMetaArch(SSDMetaArch):
 
         # TODO: handle agnostic mode and positive/negative class weights
         unmatched_cls_target = None
-        unmatched_cls_target = tf.constant([1] + self.num_classes * [0], tf.float32)
+        unmatched_cls_target = tf.constant([1] + self.num_classes * [0], tf.float32) ##[1. 0.] -> so the 0th idx is background
         self._target_assigner = TargetAssignerExtend(
             self._region_similarity_calculator,
             self._matcher,
@@ -365,19 +365,28 @@ class MANMetaArch(SSDMetaArch):
             and columns corresponding to anchors.
         """
 
-        groundtruth_boxes_list = tf.reshape(groundtruth_boxes_list, [self._batch_size*(self._seq_length), -1])
-        groundtruth_boxes_list = tf.unstack(groundtruth_boxes_list, axis=0)
+        groundtruth_boxes_list = tf.reshape(groundtruth_boxes_list, [self._batch_size*(self._seq_length), -1]) ##(2,4)
+        groundtruth_boxes_list = tf.unstack(groundtruth_boxes_list, axis=0) ##list of (4,)
+        #print '\n',groundtruth_boxes_list,'\n'
+
         groundtruth_boxlists = [
             box_list.BoxList(tf.expand_dims(boxes, axis=0)) for boxes in groundtruth_boxes_list
-        ]
+        ] ##input list of (1,4)
 
         groundtruth_classes_list = tf.reshape(groundtruth_classes_list, [self._batch_size*(self._seq_length), -1]) ## [batchsize*num_seq, 1]
-        groundtruth_classes_list = tf.unstack(groundtruth_classes_list, axis=0)
+        groundtruth_classes_list = tf.unstack(groundtruth_classes_list, axis=0) ##list of (1,)
+
+        #print '\n',tf.one_hot(groundtruth_classes_list[0], self.num_classes+1),'\n'
+        self.test_dict['gt_onehot'] = tf.one_hot(groundtruth_classes_list[0], self.num_classes+1) #[[0. 1.]]
 
         groundtruth_classes_with_background_list = [
-            tf.reshape(tf.one_hot(one_hot_encoding, self.num_classes+1), [1, self.num_classes+1])
+            tf.reshape(tf.one_hot(one_hot_encoding, self.num_classes+1),  [1, self.num_classes+1])
             for one_hot_encoding in groundtruth_classes_list
-        ]
+        ] ## input list of (1,num_classes+1)
+
+        get_anchor = self.anchors
+        # print '\n',get_anchor.data['boxes'],'\n' ##shape=(4110, 4)
+        self.test_dict['anchor'] = get_anchor.data['boxes']
 
         return target_assigner.batch_assign_targets(
             self._target_assigner, self.anchors, groundtruth_boxlists,

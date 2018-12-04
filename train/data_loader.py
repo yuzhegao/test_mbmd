@@ -144,7 +144,10 @@ def otb_collate(batch):
     gt_batch = np.stack(gt_batch, axis=0)/300.0
     template_batch = np.expand_dims(np.stack(template_batch,axis=0),axis=1)
     batchsize,num_seq,_ = gt_batch.shape
+
     label_batch = np.ones((batchsize,num_seq,1),dtype=np.int)
+    ## when use np.zeros, the location_loss = 0
+    ## so use np.ones
 
     return template_batch,img_batch,gt_batch,label_batch
 

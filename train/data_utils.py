@@ -94,3 +94,18 @@ def transform(img, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)):
 
     return img_array.astype(np.float32)
 
+def iou_y1x1y2x2(box1,box2):
+    a1,b1,a2,b2 = box1
+    c1,d1,c2,d2 = box2
+
+    area1 = (a2-a1)*(b2-b1)
+    area2 = (c2-c1)*(d2-d1)
+    xmin,ymin = max(b1,d1),max(a1,c1)
+    xmax,ymax = min(b2,d2),min(a2,c2)
+    intersect = (xmax-xmin)*(ymax-ymin)
+
+    return intersect*1.0/(area1 + area2 - intersect)
+
+
+
+

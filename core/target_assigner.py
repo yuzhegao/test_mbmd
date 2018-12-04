@@ -1,4 +1,4 @@
-from object_detection.core.target_assigner import TargetAssigner
+from lib.object_detection.core.target_assigner import TargetAssigner
 import tensorflow as tf
 from lib.object_detection.core import box_list
 
@@ -56,18 +56,37 @@ class TargetAssignerExtend(TargetAssigner):
         shape_assert = tf.assert_equal(tf.shape(groundtruth_labels)[1:],
                                        tf.shape(self._unmatched_cls_target))
 
+        # print groundtruth_labels,'\n' ##shape=(1, 2)
+        # print groundtruth_boxes.data['boxes'],'\n' ##shape=(1, 4)
+
+
         with tf.control_dependencies([shape_assert]):
             match_quality_matrix = self._similarity_calc.compare(groundtruth_boxes,
                                                                  anchors)
-            match = self._matcher.match(match_quality_matrix, **params)
-            reg_targets = self._create_regression_targets(anchors,
-                                                          groundtruth_boxes,
-                                                          match)
-            cls_targets = self._create_classification_targets(groundtruth_labels,
-                                                              match)
-            reg_weights = self._create_regression_weights(match, groundtruth_labels)
+            #print match_quality_matrix, '\n' ##IOU shape=(1, 4110)
+            iou_matrix = match_quality_matrix  ## correct
+
+            match = self._matcher.match(match_quality_matrix, **params) ## correct
+
+            #print '\n',match.match_results,'\n' ##shape=(?,)
+            reg_targets = self._create_regression_targets(anchors,  ##(4110,4)
+                                                          groundtruth_boxes,  ##(1,4)
+                                                          match)  ##(4110,)                          ## has problem !!!!!!!!
+
+            ## modify:
+            a = reg_targets[:,0]*0.1
+            b = reg_targets[:,1]*0.1
+            c = reg_targets[:,2]*0.2
+            d = reg_targets[:,3]*0.2
+            reg_targets = tf.stack((a,b,c,d),axis=1)
+
+            #print reg_targets,'has \n'
+
+            cls_targets = self._create_classification_targets(groundtruth_labels, ##(1, 2)
+                                                              match)                                  ## correct
+            reg_weights = self._create_regression_weights(match, groundtruth_labels)  ## correct
             cls_weights = self._create_classification_weights(
-                match, self._positive_class_weight, self._negative_class_weight)
+                match, self._positive_class_weight, self._negative_class_weight)  ## correct
 
             num_anchors = anchors.num_boxes_static()
             if num_anchors is not None:
@@ -76,7 +95,7 @@ class TargetAssignerExtend(TargetAssigner):
                 reg_weights = self._reset_target_shape(reg_weights, num_anchors)
                 cls_weights = self._reset_target_shape(cls_weights, num_anchors)
 
-        return cls_targets, cls_weights, reg_targets, reg_weights, match
+        return cls_targets, cls_weights, reg_targets, reg_weights, match,iou_matrix
 
     def _create_regression_weights(self, match, groundtruth_labels):
         """Set regression weight for each anchor.

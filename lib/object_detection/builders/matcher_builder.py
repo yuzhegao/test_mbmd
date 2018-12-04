@@ -35,6 +35,9 @@ def build(matcher_config):
   """
   if not isinstance(matcher_config, matcher_pb2.Matcher):
     raise ValueError('matcher_config not of type matcher_pb2.Matcher.')
+
+
+
   if matcher_config.WhichOneof('matcher_oneof') == 'argmax_matcher':
     matcher = matcher_config.argmax_matcher
     matched_threshold = unmatched_threshold = None
@@ -46,6 +49,10 @@ def build(matcher_config):
         unmatched_threshold=unmatched_threshold,
         negatives_lower_than_unmatched=matcher.negatives_lower_than_unmatched,
         force_match_for_each_row=matcher.force_match_for_each_row)
+
+
+
+
   if matcher_config.WhichOneof('matcher_oneof') == 'bipartite_matcher':
     return bipartite_matcher.GreedyBipartiteMatcher()
   raise ValueError('Empty matcher.')

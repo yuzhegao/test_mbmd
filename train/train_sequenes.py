@@ -175,7 +175,7 @@ def main(_):
                 print ('iter {}'.format(idx))
 
                 # test imgs_batch = np.ones_like(imgs_batch)
-                labels_batch = np.ones_like(labels_batch)
+                # labels_batch = np.ones_like(labels_batch)
 
                 _,loss,loss_dict = sess.run([train_op,total_loss,losses_dict], feed_dict={search_region: imgs_batch,
                                                 template: templates_batch,
@@ -185,7 +185,7 @@ def main(_):
                 print ('loss {}'.format(loss))
                 print (loss_dict)
 
-            if i%700 == 0 :
+            if i%20 == 0 :
                 save_path = model_saver.save(sess, '../model/ssd_mobilenet_video1/model.ckpt', global_step=global_step)
                 print 'save model in {}'.format(save_path)
 

@@ -203,6 +203,7 @@ class MobileTracker(object):
     def __init__(self, image, region):
         init_training = True
         config_file = '/home/yuzhe/PycharmProjects/test_mbmd/MBMD_vot_model/model/ssd_mobilenet_tracking.config'
+        #checkpoint_dir = '/home/yuzhe/ssd_mobilenet_video1/'
         checkpoint_dir = '/home/yuzhe/PycharmProjects/test_mbmd/MBMD_vot_model/model/dump'
 
         model_config, train_config, input_config, eval_config = get_configs_from_pipeline_file(config_file)

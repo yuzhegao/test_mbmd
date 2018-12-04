@@ -7,7 +7,7 @@ from core.man_anchor_generator import create_man_anchors
 from core import hyperparams_builder
 from object_detection.builders import image_resizer_builder
 from lib.object_detection.builders import losses_builder
-from object_detection.builders import matcher_builder
+from lib.object_detection.builders import matcher_builder
 from object_detection.builders import post_processing_builder
 from object_detection.builders import region_similarity_calculator_builder as sim_calc
 from object_detection.models.ssd_mobilenet_v1_feature_extractor import SSDMobileNetV1FeatureExtractor

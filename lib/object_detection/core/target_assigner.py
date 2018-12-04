@@ -137,9 +137,9 @@ class TargetAssigner(object):
       raise ValueError('groundtruth_boxes must be an BoxList')
 
     if groundtruth_labels is None:
-      groundtruth_labels = tf.ones(tf.expand_dims(groundtruth_boxes.num_boxes(),
-                                                  0))
+      groundtruth_labels = tf.ones(tf.expand_dims(groundtruth_boxes.num_boxes(),0))
       groundtruth_labels = tf.expand_dims(groundtruth_labels, -1)
+
     shape_assert = tf.assert_equal(tf.shape(groundtruth_labels)[1:],
                                    tf.shape(self._unmatched_cls_target))
 
@@ -431,19 +431,31 @@ def batch_assign_targets(target_assigner,
   reg_targets_list = []
   reg_weights_list = []
   match_list = []
+  iou_list = [] ##
+
+  # print gt_class_targets_batch,'\n' ## a list of  shape=(1, 2)
+
+  ## for - batchsize
+
+
   for anchors, gt_boxes, gt_class_targets in zip(
       anchors_batch, gt_box_batch, gt_class_targets_batch):
     (cls_targets, cls_weights, reg_targets,
-     reg_weights, match) = target_assigner.assign(
+     reg_weights, match,iou_matrix) = target_assigner.assign(
          anchors, gt_boxes, gt_class_targets)
     cls_targets_list.append(cls_targets)
     cls_weights_list.append(cls_weights)
     reg_targets_list.append(reg_targets)
     reg_weights_list.append(reg_weights)
     match_list.append(match)
+    iou_list.append(iou_matrix) ##
+
   batch_cls_targets = tf.stack(cls_targets_list)
   batch_cls_weights = tf.stack(cls_weights_list)
   batch_reg_targets = tf.stack(reg_targets_list)
   batch_reg_weights = tf.stack(reg_weights_list)
+
+  iou_list = tf.stack(iou_list)
+
   return (batch_cls_targets, batch_cls_weights, batch_reg_targets,
-          batch_reg_weights, match_list)
+          batch_reg_weights, match_list,iou_list)

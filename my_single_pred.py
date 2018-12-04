@@ -27,7 +27,7 @@ import os
 from core.preprocessor import  preprocess
 
 from train.data_loader import otb_dataset,otb_collate
-from train.data_utils import draw_box,draw_mulitbox
+from train.data_utils import draw_box,draw_mulitbox,iou_y1x1y2x2
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
@@ -38,7 +38,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def get_configs_from_pipeline_file():
     pipeline_config = pipeline_pb2.TrainEvalPipelineConfig()
-    with tf.gfile.GFile( '/home/yuzhe/PycharmProjects/test_mbmd/MBMD_vot_model/model/ssd_mobilenet_tracking.config', 'r') as f:
+    with tf.gfile.GFile( '/home/yuzhe/PycharmProjects/test_mbmd/MBMD_vot_model/model/ssd_mobilenet_video.config', 'r') as f:
         text_format.Merge(f.read(), pipeline_config)
 
     model_config = pipeline_config.model.ssd
@@ -181,9 +181,28 @@ def main():
     training_optimizer = optimizer_builder.build(train_config.optimizer, set())
     train_op = training_optimizer.minimize(total_loss, global_step=global_step)
 
+    reg_targets = detection_model.test_dict['batch_reg_targets'] #batch_cls_targets
+    cls_targets = detection_model.test_dict['batch_cls_targets'] #batch_cls_targets
+    reg_weights = detection_model.test_dict['batch_reg_weights'] #batch_cls_targets
+    cls_weights = detection_model.test_dict['batch_cls_weights'] #batch_cls_targets
 
-    test_op = detection_model.test_dict['batch_reg_targets']
+    gt_onehot = detection_model.test_dict['gt_onehot']
+    all_anchor = detection_model.test_dict['anchor']
 
+    iou_m = detection_model.test_dict['iou_matrix']
+    match1 = detection_model.test_dict['match1']
+
+    cls_loss_before = detection_model.test_dict['cls_losses']
+    reg_loss_before = detection_model.test_dict['location_losses']
+
+    n_match = detection_model.test_dict['num_matches']
+
+    decoded_boxlist = detection_model.test_dict['decoded_boxlist']
+
+    select1_op = detection_model.test_dict['select']
+
+    n_pos = detection_model.test_dict['num_pos']
+    n_neg = detection_model.test_dict['num_neg']
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -198,13 +217,12 @@ def main():
             for idx, (templates_batch, imgs_batch, gts_batch, labels_batch) in enumerate(otb_loader):
                 print ('iter {}'.format(idx))
 
-
-                # imgs_batch = np.squeeze(imgs_batch)
-                # templates_batch = np.squeeze(templates_batch)
-
-                #labels_batch = np.zeros_like(labels_batch,dtype=np.int32)
-
-                test, detection_dict,pred_dict,loss_value = sess.run([test_op, detections,prediction_dict,losses_dict], feed_dict={search_region: imgs_batch,
+                reg_targets, cls_targets, reg_weights, cls_weights,iou_mat,anchors,single_match,\
+                cls_loss_b,reg_loss_b,num_match,decoded,select1,num_pos,num_neg,\
+                detection_dict,pred_dict,loss_value \
+                = sess.run([reg_targets,cls_targets,reg_weights,cls_weights,iou_m,all_anchor,match1,
+                            cls_loss_before, reg_loss_before,n_match,decoded_boxlist,select1_op,n_pos,n_neg,
+                                    detections,prediction_dict,losses_dict], feed_dict={search_region: imgs_batch,
                                                                                         template: templates_batch,
                                                                                         groundtruth_boxes: gts_batch,
                                                                                         groundtruth_classes: labels_batch})
@@ -235,13 +253,143 @@ def main():
                 # print labels_batch
                 # print labels_batch.shape
 
-                # np.set_printoptions(threshold='nan')
-                print loss_value
-                # print test
-                # print test.shape
+                np.set_printoptions(threshold='nan')
+
+
+                ## visualze the anchor targets (cls and reg)--------------------------------------------
+
+                #print reg_targets
+                # print 'reg targets ',reg_targets.shape #(1, 4110, 4)
+                # print np.nonzero( reg_targets[0] )#.shape
+
+                # print reg_targets[0][np.nonzero( reg_targets[0] )]
+
+                idx_match = np.transpose(np.nonzero(reg_weights[0]))
+                # print reg_targets[0][idx_match]
+
                 # print '\n'
-                # print test2
-                # print test2.shape
+                #print reg_weights
+                # print 'reg weights ',reg_weights.shape #(1, 4110)
+                # print np.transpose(np.nonzero( reg_weights[0] ))#.shape
+
+                print '\n','\n'
+
+                #print cls_targets
+                # print 'cls targets ',cls_targets.shape #(1, 4110, 2)
+                pos_idx_from_cls = np.nonzero( np.argmax(cls_targets[0], axis=-1) )
+                neg_idx_from_cls = (np.nonzero( np.argmin(cls_targets[0], axis=-1) ))
+                print pos_idx_from_cls
+                # print cls_targets[0][pos_idx_from_cls]
+                # print cls_targets[0][neg_idx_from_cls]
+                # print '\n'
+                # print cls_weights
+                # print 'cls weights ',cls_weights.shape #(1, 4110)
+                # print np.transpose(np.nonzero( cls_weights[0] == 0.0 )) ## ???
+
+
+
+                ## visualize the anchor- ---------------------------------------------------
+
+                # # result: the anchor is correct
+                # print test.shape #(4110, 4)
+                # anchor = (test*300).astype(np.int32)
+                # anchor_xywh = np.zeros((anchor.shape[0],4))
+                # anchor_xywh[:,0],anchor_xywh[:,1],anchor_xywh[:,2],anchor_xywh[:,3] = \
+                #                                                     (anchor[:, 3] + anchor[:, 1])/2, \
+                #                                                     (anchor[:, 2] + anchor[:, 0])/2, \
+                #                                                     anchor[:, 3] - anchor[:, 1], \
+                #                                                     anchor[:, 2] - anchor[:, 0]
+                # print anchor_xywh[:19*19*2*5]
+                # print '\n'
+                # print anchor_xywh[19*19*2*5:]
+
+
+
+                ## visualize the IOU matrix / Match result ------------------------------------------------
+
+                ## result: the iou is correct, and the result of Match is correct
+                # print iou_mat.shape ##(2, 1, 4110)
+                #
+                iou_mat = iou_mat[0][0]
+                gt1 = gts_batch[0][0]
+                print 'gt ',gt1,'\n'
+                #
+                pos_idx = np.nonzero((iou_mat > 0.6))
+                # print pos_idx
+                # print 'match iou ',iou_mat[pos_idx]
+                pos_anchors = anchors[pos_idx]
+                # print 'pos anchor',pos_anchors,'\n'
+                #
+                # for sample in pos_anchors:
+                #     iou = iou_y1x1y2x2(sample,gt1)
+                #     print iou
+
+
+                def my_reg_tgt(t_gt, t_anchor):
+                    test_anchor_xywh = [(t_anchor[1] + t_anchor[3]) / 2.0,
+                                        (t_anchor[0] + t_anchor[2]) / 2.0,
+                                        (t_anchor[3] - t_anchor[1]),
+                                        (t_anchor[2] - t_anchor[0])]
+                    gt1_xywh = [(t_gt[1] + t_gt[3]) / 2.0,
+                                (t_gt[0] + t_gt[2]) / 2.0,
+                                (t_gt[3] - t_gt[1]),
+                                (t_gt[2] - t_gt[0])]
+
+                    test_my_target = [
+                        (gt1_xywh[1] - test_anchor_xywh[1]) / test_anchor_xywh[3],
+                        (gt1_xywh[0] - test_anchor_xywh[0]) / test_anchor_xywh[2],
+                        np.log((gt1_xywh[3] / test_anchor_xywh[3])),
+                        np.log((gt1_xywh[2] / test_anchor_xywh[2])),
+                    ]
+
+                    ## test
+                    # test_my_target = [test_my_target[0]*10,test_my_target[1]*10,
+                    #                   test_my_target[2]*5, test_my_target[3]*5]
+
+                    return np.array(test_my_target)
+
+                # for pos_a in pos_anchors:
+                #     print my_reg_tgt(gt1,pos_a)
+                # print reg_targets[0][idx_match]
+
+                # print '\n IN MATCH'
+                # match_idx = np.nonzero(single_match==0)
+                # print match_idx  ## equal to [pos_idx] upon
+                # print single_match
+
+
+                ## visualize the cls and reg LOSS ------------------------------------------------
+
+                # print cls_loss_b
+                # print cls_loss_b.shape #(2, 4110)
+                # #print reg_loss_b
+                # print reg_loss_b.shape #(2, 4110)
+
+                cls_loss_b,reg_loss_b = cls_loss_b[0],reg_loss_b[0]
+                print ([np.nonzero(reg_loss_b)]) ## correct
+
+                print 'reg total loss ',np.sum(reg_loss_b)
+                print 'reg average loss',np.sum(reg_loss_b)*1.0/len(np.transpose(pos_idx_from_cls)) ## reg loss correct
+                print '\n'
+
+                print 'num_match',num_match
+                # print cls_loss_b
+                print 'cls total loss {}/ average loss {} '.format(np.sum(cls_loss_b),np.sum(cls_loss_b)/num_match)
+
+                # print decoded.shape
+                # print (decoded*300).astype(np.int32)
+
+                print select1
+                print select1.shape
+
+                # print num_pos,num_neg
+                # print np.sort(cls_loss_b)[-num_match*5:]
+                # print np.sum(np.sort(cls_loss_b)[-num_match*5:])/num_match
+
+                print np.sum(cls_loss_b[select1])/num_match
+                print 'my calculate cls loss ',np.mean(cls_loss_b[select1])
+
+                print loss_value
 
 
 

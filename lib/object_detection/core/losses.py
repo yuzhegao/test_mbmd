@@ -157,8 +157,7 @@ class WeightedSmoothL1LocalizationLoss(Loss):
     abs_diff = tf.abs(diff)
     abs_diff_lt_1 = tf.less(abs_diff, 1)
     anchorwise_smooth_l1norm = tf.reduce_sum(
-        tf.where(abs_diff_lt_1, 0.5 * tf.square(abs_diff), abs_diff - 0.5),
-        2) * weights
+        tf.where(abs_diff_lt_1, 0.5 * tf.square(abs_diff), abs_diff - 0.5),2) * weights  ##shape=(2, 4110, 4) ->(2, 4110)
     if self._anchorwise_output:
       return anchorwise_smooth_l1norm
     return tf.reduce_sum(anchorwise_smooth_l1norm)
@@ -262,10 +261,10 @@ class WeightedSoftmaxClassificationLoss(Loss):
     Returns:
       loss: a (scalar) tensor representing the value of the loss function
     """
-    num_classes = prediction_tensor.get_shape().as_list()[-1]
+    num_classes = prediction_tensor.get_shape().as_list()[-1] ## 2
     per_row_cross_ent = (tf.nn.softmax_cross_entropy_with_logits(
         labels=tf.reshape(target_tensor, [-1, num_classes]),
-        logits=tf.reshape(prediction_tensor, [-1, num_classes])))
+        logits=tf.reshape(prediction_tensor, [-1, num_classes])))  ##(2*4110,)
     if self._anchorwise_output:
       return tf.reshape(per_row_cross_ent, tf.shape(weights)) * weights
     return tf.reduce_sum(per_row_cross_ent * tf.reshape(weights, [-1]))
@@ -444,6 +443,7 @@ class HardExampleMiner(object):
     location_losses = tf.unstack(location_losses)
     cls_losses = tf.unstack(cls_losses)
     num_images = len(decoded_boxlist_list)
+
     if not match_list:
       match_list = num_images * [None]
     if not len(location_losses) == len(decoded_boxlist_list) == len(cls_losses):
@@ -454,40 +454,60 @@ class HardExampleMiner(object):
     if len(match_list) != len(decoded_boxlist_list):
       raise ValueError('match_list must either be None or have '
                        'length=len(decoded_boxlist_list).')
+
     num_positives_list = []
     num_negatives_list = []
+
+    ## for - in a single image
     for ind, detection_boxlist in enumerate(decoded_boxlist_list):
       box_locations = detection_boxlist.get()
       match = match_list[ind]
       image_losses = cls_losses[ind]
+
+      ##########################################
       if self._loss_type == 'loc':
         image_losses = location_losses[ind]
       elif self._loss_type == 'both':
         image_losses *= self._cls_loss_weight
         image_losses += location_losses[ind] * self._loc_loss_weight
+      ##########################################
+
+
       if self._num_hard_examples is not None:
         num_hard_examples = self._num_hard_examples
       else:
         num_hard_examples = detection_boxlist.num_boxes()
       selected_indices = tf.image.non_max_suppression(
           box_locations, image_losses, num_hard_examples, self._iou_threshold)
+      ## set _iou_threshold = 0.99, so do not performs NMS                           *********************
+      ## but just select num = _iou_threshold
+
       if self._max_negatives_per_positive is not None and match:
         (selected_indices, num_positives,
          num_negatives) = self._subsample_selection_to_desired_neg_pos_ratio(
              selected_indices, match, self._max_negatives_per_positive,
              self._min_negatives_per_image)
+
         num_positives_list.append(num_positives)
         num_negatives_list.append(num_negatives)
+        a = selected_indices
+
+
       mined_location_losses.append(
           tf.reduce_sum(tf.gather(location_losses[ind], selected_indices)))
       mined_cls_losses.append(
-          tf.reduce_sum(tf.gather(cls_losses[ind], selected_indices)))
+          tf.reduce_mean(tf.gather(cls_losses[ind], selected_indices)))
     location_loss = tf.reduce_sum(tf.stack(mined_location_losses))
     cls_loss = tf.reduce_sum(tf.stack(mined_cls_losses))
+
+
+
     if match and self._max_negatives_per_positive:
       self._num_positives_list = num_positives_list
       self._num_negatives_list = num_negatives_list
-    return (location_loss, cls_loss)
+
+    return (location_loss, cls_loss,a,
+            num_positives_list[0],num_negatives_list[0])
 
   def summarize(self):
     """Summarize the number of positives and negatives after mining."""
